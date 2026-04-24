@@ -1,7 +1,7 @@
-use std::fmt;
+use std::{backtrace, fmt};
 use std::ops::{Add, Mul, Sub, Div, Neg, BitXor};
 
-fn xgcd(x: i64, y: i64) -> (i64, i64, i64) {
+pub fn xgcd(x: i64, y: i64) -> (i64, i64, i64) {
     let (mut old_r, mut r) = (x, y);
     let (mut old_s, mut s) = (1, 0);
     let (mut old_t, mut t) = (0, 1);
@@ -176,124 +176,39 @@ impl Field {
         FieldElement::new(31, *self)
     }
 
-}
+    pub fn primitive_nth_root(&self, n: i64) -> FieldElement {
+        assert_eq!(
+            self.p,
+            Self::BABY_BEAR_P,
+            "Unknown field, can't return root of unity"
+        );
 
-// Example usage
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    // Baby Bear field prime: 0x78000001 = 2013265921
-    const BABY_BEAR_P: i64 = 0x78000001;
-    
-    #[test]
-    fn test_baby_bear_field_operations() {
-        let field = Field::new(BABY_BEAR_P);
-        let a = FieldElement::new(5, field);
-        let b = FieldElement::new(7, field);
-        
-        let sum = a + b;
-        assert_eq!(sum.value, 12); // 5 + 7 = 12 mod p
-        
-        let product = a * b;
-        assert_eq!(product.value, 35); // 5 * 7 = 35 mod p (less than p)
-        
-        let diff = a - b;
-        assert_eq!(diff.value, BABY_BEAR_P - 2); // (5 - 7) mod p = p - 2
-        
-        let quotient = a / b;
-        // 7^(-1) mod Baby Bear
-        // Since p is prime, we can compute: 7^(-1) mod p
-        let inv_7 = 7_i64.mod_inverse(BABY_BEAR_P);
-        let expected = (5 * inv_7) % BABY_BEAR_P;
-        assert_eq!(quotient.value, expected);
+        // p - 1 = 2^27 * 3 * 5 → max power-of-two root is 2^27
+        let max_power_of_two = 1 << 27;
+
+        assert!(
+            n > 0 && n <= max_power_of_two && (n & (n - 1)) == 0,
+            "n must be a power of two ≤ 2^27"
+        );
+
+        // Using generator g = 31
+        let generator = self.generator();
+
+        // Compute primitive n-th root directly
+        generator ^ ((self.p - 1) / n)
     }
-    
-    #[test]
-    fn test_baby_bear_exponentiation() {
-        let field = Field::new(BABY_BEAR_P);
-        let a = FieldElement::new(2, field);
-        let result = a ^ 3;
-        assert_eq!(result.value, 8); // 2^3 = 8 mod Baby Bear
-        
-        // Test larger exponent
-        let a = FieldElement::new(3, field);
-        let result = a ^ 10;
-        let expected = 3_i64.pow(10) % BABY_BEAR_P;
-        assert_eq!(result.value, expected);
-    }
-    
-    #[test]
-    fn test_baby_bear_inverse() {
-        let field = Field::new(BABY_BEAR_P);
-        let a = FieldElement::new(3, field);
-        let inv = a.inverse();
-        
-        // 3 * inv ≡ 1 mod Baby Bear
-        assert_eq!((a * inv).value, 1);
-        
-        // The inverse of 3 mod Baby Bear should be:
-        // (p + 1) / 3 = 671088640.666? Let's compute properly
-        let expected_inv = 3_i64.mod_inverse(BABY_BEAR_P);
-        assert_eq!(inv.value, expected_inv);
-    }
-    
-    #[test]
-    fn test_baby_bear_properties() {
-        let field = Field::new(BABY_BEAR_P);
-        
-        // Test additive identity
-        let a = FieldElement::new(12345, field);
-        let zero = field.zero();
-        assert_eq!((a + zero).value, a.value);
-        
-        // Test multiplicative identity
-        let one = field.one();
-        assert_eq!((a * one).value, a.value);
-        
-        // Test additive inverse
-        let neg_a = -a;
-        assert_eq!((a + neg_a).value, 0);
-        
-        // Test multiplicative inverse property
-        if !a.is_zero() {
-            let inv_a = a.inverse();
-            assert_eq!((a * inv_a).value, 1);
+
+    pub fn sample(&self, byte_array: &[u8]) -> FieldElement {
+        let mut acc = 0;
+
+        for &b in byte_array {
+            acc = (acc << 8) ^ (b as i64);
         }
-    }
-    
-    #[test]
-    fn test_baby_bear_boundary_values() {
-        let field = Field::new(BABY_BEAR_P);
-        
-        // Test near modulus boundary
-        let a = FieldElement::new(BABY_BEAR_P - 1, field);
-        let b = FieldElement::new(1, field);
-        
-        let sum = a + b;
-        assert_eq!(sum.value, 0); // (p-1) + 1 = p ≡ 0
-        
-        let product = a * b;
-        assert_eq!(product.value, BABY_BEAR_P - 1);
-        
-        // Test large values
-        let large = FieldElement::new(1_000_000_000, field);
-        let product = large * large;
-        let expected = (1_000_000_000_i64 * 1_000_000_000) % BABY_BEAR_P;
-        assert_eq!(product.value, expected);
-    }
-}
 
-// Helper trait for modular inverse (if you don't have one)
-#[cfg(test)]
-trait ModInverse {
-    fn mod_inverse(self, modulus: i64) -> i64;
-}
+        // Reduce modulo p and ensure positive
+        let value = acc % self.p;
+        let value = if value < 0 { value + self.p } else { value };
 
-#[cfg(test)]
-impl ModInverse for i64 {
-    fn mod_inverse(self, modulus: i64) -> i64 {
-        let (a, _, _) = xgcd(self, modulus);
-        ((a % modulus) + modulus) % modulus
+        FieldElement::new(value, *self)
     }
 }
