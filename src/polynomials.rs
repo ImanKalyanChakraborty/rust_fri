@@ -1,4 +1,5 @@
 use crate::field_operations::{Field, FieldElement};
+use std::ops::{Div, Mul, Rem, Sub, BitXor};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Polynomial {
@@ -9,6 +10,9 @@ pub struct Polynomial {
 const BABY_BEAR_P: i64 = 0x78000001;
 
 impl Polynomial {
+    pub fn new(coeffs: Vec<FieldElement>) -> Polynomial {
+        Polynomial { coefficients: coeffs }
+    }
 
     // Returns degree of polynomial
     // Zero polynomial => -1
@@ -157,5 +161,159 @@ impl Polynomial {
         }
 
         Some(self.coefficients[deg as usize].clone())
+    }
+
+    // Division
+    pub fn divide(
+        numerator: &Polynomial,
+        denominator: &Polynomial,
+    ) -> Option<(Polynomial, Polynomial)> {
+
+        // Division by zero polynomial
+        if denominator.degree() == -1 {
+            return None;
+        }
+
+        // If numerator degree < denominator degree
+        if numerator.degree() < denominator.degree() {
+            return Some((
+                Polynomial::new(vec![]),
+                numerator.clone(),
+            ));
+        }
+
+        let field = denominator.coefficients[0].field;
+
+        let mut remainder = numerator.clone();
+
+        let quotient_len =
+            (numerator.degree() - denominator.degree() + 1) as usize;
+
+        let mut quotient_coefficients =
+            vec![field.zero(); quotient_len];
+
+        while remainder.degree() >= denominator.degree()
+            && !remainder.is_zero()
+        {
+            let coefficient =
+                remainder.leading_coefficient().unwrap()
+                / denominator.leading_coefficient().unwrap();
+
+            let shift =
+                (remainder.degree() - denominator.degree()) as usize;
+
+            // Build monomial: coefficient * x^shift
+            let mut monomial_coeffs =
+                vec![field.zero(); shift];
+
+            monomial_coeffs.push(coefficient);
+
+            let subtractee =
+                Polynomial::new(monomial_coeffs)
+                * denominator.clone();
+
+            quotient_coefficients[shift] = coefficient;
+
+            remainder = remainder - subtractee;
+        }
+
+        let quotient = Polynomial::new(quotient_coefficients);
+
+        Some((quotient, remainder))
+    }
+}
+
+// Overloaded Operators
+impl Div for Polynomial {
+    type Output = Polynomial;
+
+    fn div(self, other: Polynomial) -> Polynomial {
+        let (quo, rem) =
+            Polynomial::divide(&self, &other)
+            .expect("Polynomial division by zero");
+
+        assert!(
+            rem.is_zero(),
+            "cannot perform polynomial division because remainder is not zero"
+        );
+
+        quo
+    }
+}
+
+impl Rem for Polynomial {
+    type Output = Polynomial;
+
+    fn rem(self, other: Polynomial) -> Polynomial {
+        let (_, rem) =
+            Polynomial::divide(&self, &other)
+            .expect("Polynomial division by zero");
+
+        rem
+    }
+}
+
+impl Mul for Polynomial {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Polynomial::mul(&self, &rhs)
+    }
+}
+
+impl Sub for Polynomial {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Polynomial::sub(&self, &rhs)
+    }
+}
+
+impl BitXor<i64> for Polynomial {
+    type Output = Polynomial;
+
+    fn bitxor(self, exponent: i64) -> Polynomial {
+
+        assert!(exponent >= 0, "Negative exponents are not supported");
+
+        // x^0 = 1
+        if exponent == 0 {
+            return Polynomial::new(vec![
+                self.coefficients[0].field.one()
+            ]);
+        }
+
+        // 0^n = 0 for n > 0
+        if self.is_zero() {
+            return Polynomial::new(vec![]);
+        }
+
+        let field = self.coefficients[0].field;
+
+        // acc = 1
+        let mut acc = Polynomial::new(vec![field.one()]);
+
+        // Copy exponent since we'll mutate it
+        let mut exp = exponent;
+
+        // Copy base polynomial
+        let mut base = self.clone();
+
+        // Standard binary exponentiation
+        while exp > 0 {
+
+            // If current bit is set
+            if exp & 1 == 1 {
+                acc = acc * base.clone();
+            }
+
+            // Square base
+            base = base.clone() * base;
+
+            // Shift exponent right
+            exp >>= 1;
+        }
+
+        acc
     }
 }
