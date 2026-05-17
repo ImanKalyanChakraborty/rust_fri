@@ -1,5 +1,5 @@
 use crate::field_operations::{Field, FieldElement};
-use std::ops::{Div, Mul, Rem, Sub, BitXor};
+use std::ops::{BitXor, Div, Mul, Rem, Sub, Add};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Polynomial {
@@ -221,6 +221,61 @@ impl Polynomial {
 
         Some((quotient, remainder))
     }
+
+    pub fn evaluate(&self, point: FieldElement) -> FieldElement {
+        let mut xi = point.field.one();
+        let mut value = point.field.zero();
+
+        for c in &self.coefficients {
+            value = value + (*c) * xi;
+            xi = xi * point;
+        }
+
+        value
+    }
+
+    pub fn evaluate_domain(&self, domain: &[FieldElement]) -> Vec<FieldElement> {
+        let mut output: Vec<FieldElement> = vec![];
+
+        for d in domain {
+            output.push(self.evaluate(*d));
+        }
+
+        output
+    }
+
+    pub fn interpolate_domain(domain: Vec<FieldElement>, values: Vec<FieldElement>) -> Polynomial {
+        assert!(domain.len() == values.len(), "Number of elements in domain does not match number of values, hence cannot interpolate");
+        assert!(domain.len() > 0, "Cannot interpolate between zero points");
+
+        let field = domain[0].field;
+        let x = Polynomial {
+            coefficients: vec![field.zero(), field.one()]
+        };
+        let mut acc = Polynomial {
+            coefficients: vec![field.zero()]
+        };
+
+        for i in 0..domain.len() {
+            let mut prod = Polynomial {
+                coefficients: vec![values[i]]
+            };
+
+            for j in 0..domain.len() {
+                if j == i {
+                    continue;
+                }
+
+                assert!(domain[i] != domain[j], "Duplicate domain points detected");
+
+                prod = prod * (x.clone() - Polynomial {coefficients: vec![domain[j]]}) * Polynomial {coefficients: vec![(domain[i] - domain[j]).inverse()]};
+            }
+
+            acc = acc + prod;
+        }
+
+        acc
+    }
 }
 
 // Overloaded Operators
@@ -266,6 +321,14 @@ impl Sub for Polynomial {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Polynomial::sub(&self, &rhs)
+    }
+}
+
+impl Add for Polynomial {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Polynomial::add(&self, &rhs)
     }
 }
 
