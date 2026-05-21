@@ -4,10 +4,6 @@ use rust_fri::polynomials::Polynomial;
 // Baby Bear field prime
 const BABY_BEAR_P: i64 = 0x78000001;
 
-fn field() -> Field {
-    Field::new(BABY_BEAR_P)
-}
-
 fn fe(val: i64) -> FieldElement {
     FieldElement::new(val, Field::new(BABY_BEAR_P))
 }
@@ -35,7 +31,11 @@ fn test_degree_all_zeros() {
 #[test]
 fn test_degree_constant() {
     let p = poly(vec![5]);
-    assert_eq!(p.degree(), 0, "Constant non-zero polynomial should have degree 0");
+    assert_eq!(
+        p.degree(),
+        0,
+        "Constant non-zero polynomial should have degree 0"
+    );
 }
 
 #[test]
@@ -205,7 +205,11 @@ fn test_mul_degree_adds() {
     let a = poly(vec![1, 1]); // degree 1
     let b = poly(vec![1, 0, 1]); // degree 2
     let result = a.mul(&b);
-    assert_eq!(result.degree(), 3, "Degree of product should be sum of degrees");
+    assert_eq!(
+        result.degree(),
+        3,
+        "Degree of product should be sum of degrees"
+    );
 }
 
 #[test]
@@ -334,7 +338,7 @@ fn test_divide_with_remainder() {
     // x^2 divided by (x + 1)
     // x^2 = (x - 1)(x + 1) + 1  => quotient = x-1, remainder = 1
     let dividend = poly(vec![0, 0, 1]); // x^2
-    let divisor = poly(vec![1, 1]);     // 1 + x
+    let divisor = poly(vec![1, 1]); // 1 + x
     let (q, r) = Polynomial::divide(&dividend, &divisor).unwrap();
     // Verify: q * divisor + r == dividend
     let reconstructed = q.mul(&divisor).add(&r);
@@ -463,7 +467,11 @@ fn test_zerofier_vanishes_on_domain() {
     let domain = vec![fe(1), fe(2), fe(3)];
     let z = Polynomial::zerofier_domain(&domain);
     for &d in &domain {
-        assert_eq!(z.evaluate(d), fe(0), "Zerofier must evaluate to 0 on all domain points");
+        assert_eq!(
+            z.evaluate(d),
+            fe(0),
+            "Zerofier must evaluate to 0 on all domain points"
+        );
     }
 }
 
@@ -490,7 +498,10 @@ fn test_zerofier_nonzero_outside_domain() {
 fn test_scale_by_one() {
     let p = poly(vec![1, 2, 3]);
     let scaled = p.scale(fe(1));
-    assert!(scaled.equals(&p), "Scaling by 1 should leave polynomial unchanged");
+    assert!(
+        scaled.equals(&p),
+        "Scaling by 1 should leave polynomial unchanged"
+    );
 }
 
 #[test]
@@ -600,7 +611,10 @@ fn test_add_field_wraparound() {
     let a = poly(vec![BABY_BEAR_P - 1]);
     let b = poly(vec![1]);
     let result = a.add(&b);
-    assert!(result.is_zero(), "P-1 + 1 should wrap to 0 in Baby Bear field");
+    assert!(
+        result.is_zero(),
+        "P-1 + 1 should wrap to 0 in Baby Bear field"
+    );
 }
 
 #[test]

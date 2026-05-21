@@ -1,5 +1,5 @@
-use crate::field_operations::{self, Field, FieldElement};
-use std::ops::{BitXor, Div, Mul, Rem, Sub, Add};
+use crate::field_operations::{Field, FieldElement};
+use std::ops::{Add, BitXor, Div, Mul, Rem, Sub};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Polynomial {
@@ -11,18 +11,19 @@ const BABY_BEAR_P: i64 = 0x78000001;
 
 impl Polynomial {
     pub fn new(coeffs: Vec<FieldElement>) -> Polynomial {
-        Polynomial { coefficients: coeffs }
+        Polynomial {
+            coefficients: coeffs,
+        }
     }
 
     // Returns degree of polynomial
     // Zero polynomial => -1
     pub fn degree(&self) -> i64 {
-
         if self.coefficients.is_empty() {
             return -1;
         }
 
-        let zero = Field {p: BABY_BEAR_P}.zero();
+        let zero = Field { p: BABY_BEAR_P }.zero();
 
         // Check if all coefficients are zero
         if self.coefficients.iter().all(|&x| x == zero) {
@@ -42,11 +43,10 @@ impl Polynomial {
 
     // Negation of polynomial
     pub fn neg(&self) -> Polynomial {
-
         let mut negative_coefficients = self.coefficients.clone();
 
-        for i in 0..negative_coefficients.len() {
-            negative_coefficients[i] = -negative_coefficients[i].clone();
+        for coeff in &mut negative_coefficients {
+            *coeff = -*coeff;
         }
 
         Polynomial {
@@ -56,7 +56,6 @@ impl Polynomial {
 
     // Addition of two polynomials
     pub fn add(&self, other: &Polynomial) -> Polynomial {
-
         if self.degree() == -1 {
             return other.clone();
         }
@@ -67,21 +66,18 @@ impl Polynomial {
 
         let zero = Field { p: BABY_BEAR_P }.zero();
 
-        let max_len = std::cmp::max(
-            self.coefficients.len(),
-            other.coefficients.len(),
-        );
+        let max_len = std::cmp::max(self.coefficients.len(), other.coefficients.len());
 
         let mut coeffs = vec![zero; max_len];
 
         // Add self coefficients
-        for i in 0..self.coefficients.len() {
-            coeffs[i] = coeffs[i].clone() + self.coefficients[i].clone();
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(self.coefficients.len()) {
+            *coeff = *coeff + self.coefficients[i];
         }
 
         // Add other coefficients
-        for i in 0..other.coefficients.len() {
-            coeffs[i] = coeffs[i].clone() + other.coefficients[i].clone();
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(other.coefficients.len()) {
+            *coeff = *coeff + other.coefficients[i];
         }
 
         Polynomial {
@@ -96,39 +92,31 @@ impl Polynomial {
 
     // Multiplication
     pub fn mul(&self, other: &Polynomial) -> Polynomial {
-
         if self.coefficients.is_empty() || other.coefficients.is_empty() {
             return Polynomial {
                 coefficients: vec![],
             };
         }
 
-        let zero = Field {p: BABY_BEAR_P}.zero();
+        let zero = Field { p: BABY_BEAR_P }.zero();
 
-        let mut buf = vec![
-            zero;
-            self.coefficients.len() + other.coefficients.len() - 1
-        ];
+        let mut buf = vec![zero; self.coefficients.len() + other.coefficients.len() - 1];
 
         for i in 0..self.coefficients.len() {
-
             if self.coefficients[i] == zero {
                 continue;
             }
 
             for j in 0..other.coefficients.len() {
-                buf[i + j] = buf[i + j].clone() + self.coefficients[i].clone() * other.coefficients[j].clone();
+                buf[i + j] = buf[i + j] + self.coefficients[i] * other.coefficients[j];
             }
         }
 
-        Polynomial {
-            coefficients: buf,
-        }
+        Polynomial { coefficients: buf }
     }
 
     // Equality check
     pub fn equals(&self, other: &Polynomial) -> bool {
-
         if self.degree() != other.degree() {
             return false;
         }
@@ -153,14 +141,13 @@ impl Polynomial {
 
     // Leading coefficient
     pub fn leading_coefficient(&self) -> Option<FieldElement> {
-
         let deg = self.degree();
 
         if deg == -1 {
             return None;
         }
 
-        Some(self.coefficients[deg as usize].clone())
+        Some(self.coefficients[deg as usize])
     }
 
     // Division
@@ -168,7 +155,6 @@ impl Polynomial {
         numerator: &Polynomial,
         denominator: &Polynomial,
     ) -> Option<(Polynomial, Polynomial)> {
-
         // Division by zero polynomial
         if denominator.degree() == -1 {
             return None;
@@ -176,41 +162,29 @@ impl Polynomial {
 
         // If numerator degree < denominator degree
         if numerator.degree() < denominator.degree() {
-            return Some((
-                Polynomial::new(vec![]),
-                numerator.clone(),
-            ));
+            return Some((Polynomial::new(vec![]), numerator.clone()));
         }
 
         let field = denominator.coefficients[0].field;
 
         let mut remainder = numerator.clone();
 
-        let quotient_len =
-            (numerator.degree() - denominator.degree() + 1) as usize;
+        let quotient_len = (numerator.degree() - denominator.degree() + 1) as usize;
 
-        let mut quotient_coefficients =
-            vec![field.zero(); quotient_len];
+        let mut quotient_coefficients = vec![field.zero(); quotient_len];
 
-        while remainder.degree() >= denominator.degree()
-            && !remainder.is_zero()
-        {
-            let coefficient =
-                remainder.leading_coefficient().unwrap()
+        while remainder.degree() >= denominator.degree() && !remainder.is_zero() {
+            let coefficient = remainder.leading_coefficient().unwrap()
                 / denominator.leading_coefficient().unwrap();
 
-            let shift =
-                (remainder.degree() - denominator.degree()) as usize;
+            let shift = (remainder.degree() - denominator.degree()) as usize;
 
             // Build monomial: coefficient * x^shift
-            let mut monomial_coeffs =
-                vec![field.zero(); shift];
+            let mut monomial_coeffs = vec![field.zero(); shift];
 
             monomial_coeffs.push(coefficient);
 
-            let subtractee =
-                Polynomial::new(monomial_coeffs)
-                * denominator.clone();
+            let subtractee = Polynomial::new(monomial_coeffs) * denominator.clone();
 
             quotient_coefficients[shift] = coefficient;
 
@@ -245,20 +219,23 @@ impl Polynomial {
     }
 
     pub fn interpolate_domain(domain: &[FieldElement], values: &[FieldElement]) -> Polynomial {
-        assert!(domain.len() == values.len(), "Number of elements in domain does not match number of values, hence cannot interpolate");
-        assert!(domain.len() > 0, "Cannot interpolate between zero points");
+        assert!(
+            domain.len() == values.len(),
+            "Number of elements in domain does not match number of values, hence cannot interpolate"
+        );
+        assert!(!domain.is_empty(), "Cannot interpolate between zero points");
 
         let field = domain[0].field;
         let x = Polynomial {
-            coefficients: vec![field.zero(), field.one()]
+            coefficients: vec![field.zero(), field.one()],
         };
         let mut acc = Polynomial {
-            coefficients: vec![field.zero()]
+            coefficients: vec![field.zero()],
         };
 
         for i in 0..domain.len() {
             let mut prod = Polynomial {
-                coefficients: vec![values[i]]
+                coefficients: vec![values[i]],
             };
 
             for j in 0..domain.len() {
@@ -268,7 +245,14 @@ impl Polynomial {
 
                 assert!(domain[i] != domain[j], "Duplicate domain points detected");
 
-                prod = prod * (x.clone() - Polynomial {coefficients: vec![domain[j]]}) * Polynomial {coefficients: vec![(domain[i] - domain[j]).inverse()]};
+                prod = prod
+                    * (x.clone()
+                        - Polynomial {
+                            coefficients: vec![domain[j]],
+                        })
+                    * Polynomial {
+                        coefficients: vec![(domain[i] - domain[j]).inverse()],
+                    };
             }
 
             acc = acc + prod;
@@ -277,13 +261,13 @@ impl Polynomial {
         acc
     }
 
-    pub fn zerofier_domain(domain: &[FieldElement]) -> Polynomial{
+    pub fn zerofier_domain(domain: &[FieldElement]) -> Polynomial {
         let field = domain[0].field;
         let x = Polynomial {
-            coefficients: vec![field.zero(), field.one()]
+            coefficients: vec![field.zero(), field.one()],
         };
         let mut acc = Polynomial {
-            coefficients: vec![field.one()]
+            coefficients: vec![field.one()],
         };
 
         for d in domain {
@@ -294,10 +278,10 @@ impl Polynomial {
     }
 
     pub fn scale(&self, factor: FieldElement) -> Polynomial {
-        let mut temp_coefficients : Vec<FieldElement>= vec![];
-        
+        let mut temp_coefficients: Vec<FieldElement> = vec![];
+
         for i in 0..self.coefficients.len() {
-            let val = (factor ^ i as i64) * self.coefficients[i].clone();
+            let val = (factor ^ i as i64) * self.coefficients[i];
             temp_coefficients.push(val);
         }
 
@@ -324,9 +308,7 @@ impl Div for Polynomial {
     type Output = Polynomial;
 
     fn div(self, other: Polynomial) -> Polynomial {
-        let (quo, rem) =
-            Polynomial::divide(&self, &other)
-            .expect("Polynomial division by zero");
+        let (quo, rem) = Polynomial::divide(&self, &other).expect("Polynomial division by zero");
 
         assert!(
             rem.is_zero(),
@@ -341,9 +323,7 @@ impl Rem for Polynomial {
     type Output = Polynomial;
 
     fn rem(self, other: Polynomial) -> Polynomial {
-        let (_, rem) =
-            Polynomial::divide(&self, &other)
-            .expect("Polynomial division by zero");
+        let (_, rem) = Polynomial::divide(&self, &other).expect("Polynomial division by zero");
 
         rem
     }
@@ -377,14 +357,11 @@ impl BitXor<i64> for Polynomial {
     type Output = Polynomial;
 
     fn bitxor(self, exponent: i64) -> Polynomial {
-
         assert!(exponent >= 0, "Negative exponents are not supported");
 
         // x^0 = 1
         if exponent == 0 {
-            return Polynomial::new(vec![
-                self.coefficients[0].field.one()
-            ]);
+            return Polynomial::new(vec![self.coefficients[0].field.one()]);
         }
 
         // 0^n = 0 for n > 0
@@ -405,7 +382,6 @@ impl BitXor<i64> for Polynomial {
 
         // Standard binary exponentiation
         while exp > 0 {
-
             // If current bit is set
             if exp & 1 == 1 {
                 acc = acc * base.clone();

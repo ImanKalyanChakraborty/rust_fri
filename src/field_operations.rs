@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Add, Mul, Sub, Div, Neg, BitXor};
+use std::ops::{Add, BitXor, Div, Mul, Neg, Sub};
 
 pub fn xgcd(x: i64, y: i64) -> (i64, i64, i64) {
     let (mut old_r, mut r) = (x, y);
@@ -8,12 +8,12 @@ pub fn xgcd(x: i64, y: i64) -> (i64, i64, i64) {
 
     while r != 0 {
         let quotient = old_r / r;
-        
+
         // Store old values before updating
         let (next_old_r, next_r) = (r, old_r - quotient * r);
         let (next_old_s, next_s) = (s, old_s - quotient * s);
         let (next_old_t, next_t) = (t, old_t - quotient * t);
-        
+
         old_r = next_old_r;
         r = next_r;
         old_s = next_old_s;
@@ -35,11 +35,11 @@ impl FieldElement {
     pub fn new(value: i64, field: Field) -> Self {
         FieldElement { value, field }
     }
-    
+
     pub fn is_zero(&self) -> bool {
         self.value == 0
     }
-    
+
     pub fn inverse(&self) -> Self {
         self.field.inverse(self)
     }
@@ -53,7 +53,7 @@ impl fmt::Display for FieldElement {
 
 impl Add for FieldElement {
     type Output = Self;
-    
+
     fn add(self, right: Self) -> Self {
         self.field.add(&self, &right)
     }
@@ -61,7 +61,7 @@ impl Add for FieldElement {
 
 impl<'a> Add<&'a FieldElement> for FieldElement {
     type Output = FieldElement;
-    
+
     fn add(self, right: &'a FieldElement) -> FieldElement {
         self.field.add(&self, right)
     }
@@ -69,7 +69,7 @@ impl<'a> Add<&'a FieldElement> for FieldElement {
 
 impl Sub for FieldElement {
     type Output = Self;
-    
+
     fn sub(self, right: Self) -> Self {
         self.field.subtract(&self, &right)
     }
@@ -77,7 +77,7 @@ impl Sub for FieldElement {
 
 impl Mul for FieldElement {
     type Output = Self;
-    
+
     fn mul(self, right: Self) -> Self {
         self.field.multiply(&self, &right)
     }
@@ -85,7 +85,7 @@ impl Mul for FieldElement {
 
 impl Div for FieldElement {
     type Output = Self;
-    
+
     fn div(self, right: Self) -> Self {
         self.field.divide(&self, &right)
     }
@@ -93,7 +93,7 @@ impl Div for FieldElement {
 
 impl Neg for FieldElement {
     type Output = Self;
-    
+
     fn neg(self) -> Self {
         self.field.negate(&self)
     }
@@ -101,15 +101,15 @@ impl Neg for FieldElement {
 
 impl BitXor<i64> for FieldElement {
     type Output = Self;
-    
+
     fn bitxor(self, exponent: i64) -> Self {
-        let mut acc = FieldElement::new(1, self.field.clone());
-        let val = FieldElement::new(self.value, self.field.clone());
-        
+        let mut acc = FieldElement::new(1, self.field);
+        let val = FieldElement::new(self.value, self.field);
+
         for i in (0..64).rev() {
             acc = acc * acc;
             if (exponent >> i) & 1 != 0 {
-                acc = acc * val.clone();
+                acc = acc * val;
             }
         }
         acc
@@ -128,38 +128,38 @@ impl Field {
     pub fn new(p: i64) -> Self {
         Field { p }
     }
-    
+
     pub fn zero(&self) -> FieldElement {
         FieldElement::new(0, *self)
     }
-    
+
     pub fn one(&self) -> FieldElement {
         FieldElement::new(1, *self)
     }
-    
+
     pub fn multiply(&self, left: &FieldElement, right: &FieldElement) -> FieldElement {
         FieldElement::new((left.value * right.value) % self.p, *self)
     }
-    
+
     pub fn add(&self, left: &FieldElement, right: &FieldElement) -> FieldElement {
         FieldElement::new((left.value + right.value) % self.p, *self)
     }
-    
+
     pub fn subtract(&self, left: &FieldElement, right: &FieldElement) -> FieldElement {
         FieldElement::new((self.p + left.value - right.value) % self.p, *self)
     }
-    
+
     pub fn negate(&self, operand: &FieldElement) -> FieldElement {
         FieldElement::new((self.p - operand.value) % self.p, *self)
     }
-    
+
     pub fn inverse(&self, operand: &FieldElement) -> FieldElement {
         let (a, _, _) = xgcd(operand.value, self.p);
         // Ensure a is positive
         let a = ((a % self.p) + self.p) % self.p;
         FieldElement::new(a, *self)
     }
-    
+
     pub fn divide(&self, left: &FieldElement, right: &FieldElement) -> FieldElement {
         assert!(!right.is_zero(), "divide by zero");
         let (a, _, _) = xgcd(right.value, self.p);
@@ -169,8 +169,11 @@ impl Field {
 
     // Generator and Primitive nth root
     pub fn generator(&self) -> FieldElement {
-        assert_eq!(self.p, Self::BABY_BEAR_P, 
-            "Do not know generator for other fields beyond BabyBear");
+        assert_eq!(
+            self.p,
+            Self::BABY_BEAR_P,
+            "Do not know generator for other fields beyond BabyBear"
+        );
 
         // 31 is a valid primitive root of BabyBear
         FieldElement::new(31, *self)
