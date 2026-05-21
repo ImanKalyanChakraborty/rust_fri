@@ -1,4 +1,4 @@
-use crate::field_operations::{Field, FieldElement};
+use crate::field_operations::{self, Field, FieldElement};
 use std::ops::{BitXor, Div, Mul, Rem, Sub, Add};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -244,7 +244,7 @@ impl Polynomial {
         output
     }
 
-    pub fn interpolate_domain(domain: Vec<FieldElement>, values: Vec<FieldElement>) -> Polynomial {
+    pub fn interpolate_domain(domain: &[FieldElement], values: &[FieldElement]) -> Polynomial {
         assert!(domain.len() == values.len(), "Number of elements in domain does not match number of values, hence cannot interpolate");
         assert!(domain.len() > 0, "Cannot interpolate between zero points");
 
@@ -275,6 +275,47 @@ impl Polynomial {
         }
 
         acc
+    }
+
+    pub fn zerofier_domain(domain: &[FieldElement]) -> Polynomial{
+        let field = domain[0].field;
+        let x = Polynomial {
+            coefficients: vec![field.zero(), field.one()]
+        };
+        let mut acc = Polynomial {
+            coefficients: vec![field.one()]
+        };
+
+        for d in domain {
+            acc = acc * (x.clone() - Polynomial::new(vec![*d]));
+        }
+
+        acc
+    }
+
+    pub fn scale(&self, factor: FieldElement) -> Polynomial {
+        let mut temp_coefficients : Vec<FieldElement>= vec![];
+        
+        for i in 0..self.coefficients.len() {
+            let val = (factor ^ i as i64) * self.coefficients[i].clone();
+            temp_coefficients.push(val);
+        }
+
+        Polynomial::new(temp_coefficients)
+    }
+
+    pub fn test_collinearity(points: &[(FieldElement, FieldElement)]) -> bool {
+        let mut domain: Vec<FieldElement> = vec![];
+        let mut values: Vec<FieldElement> = vec![];
+
+        for (x, y) in points {
+            domain.push(*x);
+            values.push(*y);
+        }
+
+        let polynomial = Polynomial::interpolate_domain(&domain, &values);
+
+        polynomial.degree() <= 1
     }
 }
 
